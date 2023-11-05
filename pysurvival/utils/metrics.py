@@ -78,7 +78,74 @@ def concordance_index(model, X, T, E, include_ties = True,
     else:
         return results
 
+def concordance_index_mine(model_wrapper, model, X, T, E, include_ties = True, 
+    additional_results=False, **kwargs):
+    """ 
+    Computing the C-index based on *On The C-Statistics For Evaluating Overall
+    Adequacy Of Risk Prediction Procedures With Censored Survival Data* and
+    *Estimating the Concordance Probability in a Survival Analysis
+    with a Discrete Number of Risk Groups* and *Concordance for Survival 
+    Time Data: Fixed and Time-Dependent Covariates and Possible Ties in
+    Predictor and Time 
 
+    Similarly to the AUC, C-index = 1 corresponds to the best model 
+    prediction, and C-index = 0.5 represents a random prediction.
+
+    Parameters:
+    -----------
+    * model : Pysurvival object
+        Pysurvival model
+
+    * X : array-like, shape=(n_samples, n_features)
+        The input samples.
+
+    * E : array-like, shape = [n_samples] 
+        The Event indicator array such that E = 1. if the event occured
+        E = 0. if censoring occured
+    
+    * include_ties: bool (default=True)
+        Specifies whether ties in risk score are included in calculations
+
+    * additional_results: bool (default=False)
+        Specifies whether only the c-index should be returned (False)
+        or if a dict of values should returned. the values are:
+            - c-index
+            - nb_pairs
+            - nb_concordant_pairs
+
+    Returns:
+    --------
+        * results: double or dict (if additional_results = True)
+            - results is the c-index (double) if additional_results = False
+            - results is dict if additional_results = True such that
+                results[0] = C-index;
+                results[1] = nb_pairs;
+                results[2] = nb_concordant_pairs;
+                    
+    Example:
+    --------
+
+
+    """
+
+    # Checking the format of the data 
+    risk = model_wrapper.predict_risk_mine(model, X, **kwargs)
+    risk, T, E = utils.check_data(risk, T, E)
+
+    # Ordering risk, T and E in descending order according to T
+    order = np.argsort(-T)
+    risk = risk[order]
+    T = T[order]
+    E = E[order]
+
+    # Calculating th c-index
+    results = _concordance_index(risk, T, E, include_ties)
+
+    if not additional_results:
+        return results[0]
+    else:
+        return results
+    
 def c_index(model, X, T, E, include_ties = True, additional_results=False):
     return concordance_index(model, X, T, E, include_ties, additional_results)
 

@@ -4,7 +4,7 @@ import torch.nn as nn
 import progressbar
 import time
 import copy
-
+from pysurvival.utils.metrics import concordance_index_mine
 def initialization(init_method, W, is_tensor=True):
     """ Initializes the provided tensor. 
     
@@ -225,4 +225,141 @@ def optimize(loss_function, model, optimizer_str, lr=1e-4, nb_epochs=1000,
 
     return model, loss_values
 
+def optimize_mine(model_wrapper, loss_function, model, optimizer_str, X, T, E, X_valid, T_valid, E_valid, Risk, Fail, 
+                      Efron_coef, Efron_one, Efron_anti_one, l2_reg, lr=1e-4, nb_epochs=1000, 
+               verbose = True, num_workers = 0,):
+    """ 
+    Providing the schema of the iterative method for optimizing a 
+    differentiable objective function for models that use gradient centric
+    schemas (a.k.a order 1 optimization)
 
+    Parameters:
+    -----------
+        * loss_function: function
+            Loss function of the model
+
+        * model: torch object
+            Actual model to optimize
+
+        * optimizer_str: str 
+            Defines the type of optimizer to use. Here are the possible options:
+                - adadelta
+                - adagrad
+                - adam
+                - adamax
+                - rmsprop
+                - sparseadam
+                - sgd
+
+        * lr: float (default=1e-4)
+            learning reate used in the optimization
+
+        * nb_epochs: int (default=1000)
+            The number of iterations in the optimization
+
+        * verbose: bool (default=True)
+            Whether or not producing detailed logging about the modeling
+    """
+
+    # Choosing an optimizer
+    W = model.parameters()
+    if optimizer_str.lower() == 'adadelta':
+        optimizer = torch.optim.Adadelta(W, lr=lr) 
+        
+    elif optimizer_str.lower() == 'adagrad':
+        optimizer = torch.optim.Adagrad(W, lr=lr) 
+    
+    elif optimizer_str.lower() == 'adam':
+        optimizer = torch.optim.Adam(W, lr=lr) 
+    
+    elif optimizer_str.lower() == 'adamax':
+        optimizer = torch.optim.Adamax(W, lr=lr)     
+    
+    elif optimizer_str.lower() == 'rmsprop':
+        optimizer = torch.optim.RMSprop(W, lr=lr)  
+    
+    elif optimizer_str.lower() == 'sparseadam':
+        optimizer = torch.optim.SparseAdam(W, lr=lr)  
+    
+    elif optimizer_str.lower() == 'sgd':
+        optimizer = torch.optim.SGD(W, lr=lr)  
+
+    elif optimizer_str.lower() == 'lbfgs':
+        optimizer = torch.optim.LBFGS(W, lr=lr)
+    
+    elif optimizer_str.lower() == 'rprop':
+        optimizer = torch.optim.Rprop(W, lr=lr)
+
+    else:
+        error = "{} optimizer isn't implemented".format(optimizer_str)
+        raise NotImplementedError(error)
+    
+    # Initializing the Progress Bar
+    loss_values = []
+    if verbose:
+        widgets = [ '% Completion: ', progressbar.Percentage(), 
+                   progressbar.Bar('*'), ''] 
+        bar = progressbar.ProgressBar(maxval=nb_epochs, widgets=widgets)
+        bar.start()
+
+    # Updating the weights at each training epoch
+    temp_model = None
+    metrics = {"c_index_test": [], "c_index_train": []}
+    for epoch in range(nb_epochs):
+
+        # Backward pass and optimization
+        def closure():
+            optimizer.zero_grad()
+            loss = loss_function(model, X, Risk, Fail, 
+                      Efron_coef, Efron_one, Efron_anti_one, l2_reg)
+            loss.backward()
+            return loss
+
+        if 'lbfgs' in optimizer_str.lower() :
+            optimizer.step(closure)
+        else:
+            optimizer.step()
+        loss = closure()
+        loss_value = loss.item()
+
+        # Printing error message if the gradient didn't explode
+        if np.isnan(loss_value) or np.isinf(loss_value):
+            error = "The gradient exploded... "
+            error += "You should reduce the learning"
+            error += "rate (lr) of your optimizer"
+            if verbose:
+                widgets[-1] = error
+            else:
+                print(error)
+            break
+            
+        # Otherwise, printing value of loss function
+        else:
+            temp_model = copy.deepcopy(model)
+            loss_values.append( loss_value )
+            if verbose:
+                widgets[-1] = "Loss: {:6.2f}".format( loss_value )
+            if epoch%10 == 0:
+                c_index_test = concordance_index_mine(model_wrapper, temp_model, X=X_valid, T=T_valid, E=E_valid)
+                c_index_train = concordance_index_mine(model_wrapper, temp_model, X=X.numpy(), T=T, E=E)
+                metrics["c_index_test"].append(c_index_test)
+                metrics["c_index_train"].append(c_index_train)
+                
+
+        # Updating the progressbar
+        if verbose:
+            bar.update( epoch + 1 )
+            
+    model_wrapper.metrics = metrics
+    # Terminating the progressbar
+    if verbose:
+        bar.finish()
+        
+    # Finilazing the model
+    if temp_model is not None:
+        temp_model = temp_model.eval()
+        model = copy.deepcopy(temp_model)
+    else:
+        raise ValueError(error)
+
+    return model, loss_values
