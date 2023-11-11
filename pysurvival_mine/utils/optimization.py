@@ -4,7 +4,7 @@ import torch.nn as nn
 import progressbar
 import time
 import copy
-from pysurvival.utils.metrics import concordance_index_mine
+from pysurvival_mine.utils.metrics import concordance_index_mine
 def initialization(init_method, W, is_tensor=True):
     """ Initializes the provided tensor. 
     
@@ -225,9 +225,9 @@ def optimize(loss_function, model, optimizer_str, lr=1e-4, nb_epochs=1000,
 
     return model, loss_values
 
-def optimize_mine(model_wrapper, loss_function, model, optimizer_str, X, T, E, X_valid, T_valid, E_valid, Risk, Fail, 
-                      Efron_coef, Efron_one, Efron_anti_one, l2_reg, lr=1e-4, nb_epochs=1000, 
-               verbose = True, num_workers = 0,):
+def optimize_mine(model_wrapper, loss_function, model, optimizer_str, X, T, E, X_valid, T_valid, E_valid, lr=1e-4, nb_epochs=1000, 
+               verbose = True, num_workers = 0, **kargs):
+
     """ 
     Providing the schema of the iterative method for optimizing a 
     differentiable objective function for models that use gradient centric
@@ -304,14 +304,13 @@ def optimize_mine(model_wrapper, loss_function, model, optimizer_str, X, T, E, X
 
     # Updating the weights at each training epoch
     temp_model = None
-    metrics = {"c_index_test": [], "c_index_train": []}
+    metrics = {"c_index_valid": [], "c_index_train": []}
     for epoch in range(nb_epochs):
 
         # Backward pass and optimization
         def closure():
             optimizer.zero_grad()
-            loss = loss_function(model, X, Risk, Fail, 
-                      Efron_coef, Efron_one, Efron_anti_one, l2_reg)
+            loss = loss_function(model, X, T, E, **kargs)
             loss.backward()
             return loss
 
@@ -339,10 +338,17 @@ def optimize_mine(model_wrapper, loss_function, model, optimizer_str, X, T, E, X
             loss_values.append( loss_value )
             if verbose:
                 widgets[-1] = "Loss: {:6.2f}".format( loss_value )
+            
+            if early_stopping:
+                c_index_valid = concordance_index_mine(model_wrapper, temp_model, X=np.array(X_valid), T=np.array(T_valid).flatten(), E=np.array(E_valid).flatten())
+                c_index_train = concordance_index_mine(model_wrapper, temp_model, X=np.array(X), T=np.array(T).flatten(), E=np.array(E).flatten())
+                metrics["c_index_valid"].append(c_index_valid)
+                metrics["c_index_train"].append(c_index_train)
+
             if epoch%10 == 0:
-                c_index_test = concordance_index_mine(model_wrapper, temp_model, X=X_valid, T=T_valid, E=E_valid)
-                c_index_train = concordance_index_mine(model_wrapper, temp_model, X=X.numpy(), T=T, E=E)
-                metrics["c_index_test"].append(c_index_test)
+                c_index_valid = concordance_index_mine(model_wrapper, temp_model, X=np.array(X_valid), T=np.array(T_valid).flatten(), E=np.array(E_valid).flatten())
+                c_index_train = concordance_index_mine(model_wrapper, temp_model, X=np.array(X), T=np.array(T).flatten(), E=np.array(E).flatten())
+                metrics["c_index_valid"].append(c_index_valid)
                 metrics["c_index_train"].append(c_index_train)
                 
 

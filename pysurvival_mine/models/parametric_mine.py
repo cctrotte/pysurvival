@@ -1,14 +1,13 @@
-from __future__ import absolute_import
 import numpy as np
 import scipy 
 import torch
-from pysurvival.models import BaseModel
-from pysurvival import utils, HAS_GPU
-from pysurvival.utils import optimization as opt
-from pysurvival.utils import neural_networks as nn
+from pysurvival_mine.models import BaseModel
+from pysurvival_mine import utils, HAS_GPU
+from pysurvival_mine.utils import optimization as opt
+from pysurvival_mine.utils import neural_networks as nn
 
 
-class BaseParametricModel(BaseModel):
+class BaseParametricModelMine(BaseModel):
     """ Base class for all the Parametric estimators:
         ---------------------------------------------
 
@@ -35,7 +34,7 @@ class BaseParametricModel(BaseModel):
         self.bins = bins
 
         # Initializing the elements from BaseModel
-        super(BaseParametricModel, self).__init__(auto_scaler)
+        super(BaseParametricModelMine, self).__init__(auto_scaler)
         
     
     def get_hazard_survival(self, model, x, t):
@@ -94,7 +93,7 @@ class BaseParametricModel(BaseModel):
         return loss
 
     
-    def fit(self, X, T, E, init_method = 'glorot_uniform', optimizer ='adam', 
+    def fit(self, X, T, E, X_valid, T_valid, E_valid, init_method = 'glorot_uniform', optimizer ='adam', 
             lr = 1e-4, num_epochs = 1000, l2_reg=1e-2, verbose=True, 
             is_min_time_zero = True, extra_pct_time = 0.1):
         """ 
@@ -251,9 +250,13 @@ class BaseParametricModel(BaseModel):
         T = torch.FloatTensor(T.reshape(-1, 1))
         E = torch.FloatTensor(E.reshape(-1, 1))
 
+        X_valid = torch.FloatTensor(X_valid)
+        T_valid = torch.FloatTensor(T_valid.reshape(-1, 1))
+        E_valid = torch.FloatTensor(E_valid.reshape(-1, 1))
+
         # Performing order 1 optimization
-        model, loss_values = opt.optimize(self.loss_function, model, optimizer, 
-            lr, num_epochs, verbose,  X=X, T=T, E=E, l2_reg=l2_reg)
+        model, loss_values = opt.optimize_mine(self, self.loss_function, model, optimizer, 
+            X, T, E, X_valid, T_valid,E_valid, lr, num_epochs, verbose, l2_reg=l2_reg)
         
         # Saving attributes
         self.model = model.eval()
@@ -266,7 +269,7 @@ class BaseParametricModel(BaseModel):
         return self
     
     
-    def predict(self, x, t = None):
+    def predict(self, x, t = None, model = None):
         """ 
         Predicting the hazard, density and survival functions
         
@@ -298,7 +301,10 @@ class BaseParametricModel(BaseModel):
         times = torch.FloatTensor(self.times.flatten())
             
         # Calculating hazard, density, Survival
-        hazard, Survival = self.get_hazard_survival(self.model, x, times)
+        if model is None:
+            hazard, Survival = self.get_hazard_survival(self.model, x, times)
+        else:
+            hazard, Survival = self.get_hazard_survival(model, x, times)
         density = hazard*Survival
 
         # Transforming into numpy objects
@@ -313,67 +319,58 @@ class BaseParametricModel(BaseModel):
             min_abs_value = [abs(a_j_1-t) for (a_j_1, a_j) in self.time_buckets]
             index = np.argmin(min_abs_value)
             return hazard[:, index], density[:, index], Survival[:, index]
-
-
-
-class ExponentialModel(BaseParametricModel):
-    """ 
-    ExponentialModel:
-    -----------------
         
-    The exponential distribution is the simplest and most
-    important distribution in survival studies. Being independent
-    of prior information, it is known as a "lack of
-    memory" distribution requiring that the present age of the
-    living organism does not influence its future survival.
-    (Application of Parametric Models to a Survival Analysis of
-    Hemodialysis Patients)
-    """
-    
-    def get_hazard_survival(self, model, x, t):
-        """ Computing the hazard and Survival functions. """
+    def predict_risk_mine(self, model, x, use_log=False):
+        """ Computing the risk score 
+
+        Parameters:
+        -----------
+        * `x` : **array-like** *shape=(n_samples, n_features)* --
+            array-like representing the datapoints. 
+            x should not be standardized before, the model
+            will take care of it
+
+        * `use_log`: **bool** *(default=True)* -- 
+            Applies the log function to the risk values
+
+        """
         
-        # Computing the score
-        score  = model(x).reshape(-1, 1)
+        hazard, density, survival = self.predict( x, model = model)
+        cumulative_hazard = np.cumsum(hazard, 1)
+        risk = np.sum(cumulative_hazard, 1)
+        if use_log:
+            return np.log(risk)
+        else:
+            return risk
 
-        # Computing hazard and Survival
-        hazard   = score
-        Survival = torch.exp(-hazard*t)   
-            
-        return hazard, Survival
+    def predict_risk(self, x, **kwargs):
+        """ Predicts the Risk Score/Mortality function for all t,
+            R(x) = sum( cumsum(hazard(t, x)) )
+            According to Random survival forests from Ishwaran H et al
+            https://arxiv.org/pdf/0811.1645.pdf
 
+            Parameters
+            ----------
+            * `x` : **array-like** *shape=(n_samples, n_features)* --
+                array-like representing the datapoints. 
+                x should not be standardized before, the model
+                will take care of it
 
+            Returns
+            -------
+            * `risk_score`: **numpy.ndarray** --
+                array-like representing the prediction of Risk Score function
+        """        
 
-class WeibullModel(BaseParametricModel):
-    """
-    WeibullModel:
-    -------------
-    
-    The Weibull distribution is a generalized form of the exponential
-    distribution and is de facto more flexible than the exponential model. 
-    It is a two-parameter model (alpha and beta):
-        * alpha is the location parameter
-        * beta is the shape parameter 
-    """
+        # Checking if the data has the right format
+        x = utils.check_data(x)
 
-    def get_hazard_survival(self, model, x, t):
-        """ Computing the hazard and Survival functions. """
+        # Calculating cumulative_hazard/risk
+        cumulative_hazard = self.predict_cumulative_hazard(x, None, **kwargs)
+        risk_score = np.sum(cumulative_hazard, 1)
+        return risk_score
         
-        # Computing the score
-        score  = model(x).reshape(-1, 1)
-
-        # Extracting beta
-        beta = list(model.parameters())[-1]
-
-        # Computing hazard and Survival
-        hazard   = beta*score*torch.pow(t, beta-1) 
-        Survival = torch.exp(- score*torch.pow(t, beta) )  
-        
-        return hazard, Survival
-
-
-
-class GompertzModel(BaseParametricModel):
+class GompertzModelMine(BaseParametricModelMine):
     """
     GompertzModel:
     --------------
@@ -398,10 +395,8 @@ class GompertzModel(BaseParametricModel):
         Survival = torch.exp(-score/beta*(torch.exp(beta*t)-1) )
         
         return hazard, Survival
-    
 
-
-class LogLogisticModel(BaseParametricModel):
+class LogLogisticModelMine(BaseParametricModelMine):
     """
     LogLogisticModel:
     ----------------
@@ -430,7 +425,7 @@ class LogLogisticModel(BaseParametricModel):
         return hazard, Survival
 
 
-class LogNormalModel(BaseParametricModel):
+class LogNormalModelMine(BaseParametricModelMine):
     """
     LogNormalModel:
     ---------------

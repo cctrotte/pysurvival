@@ -1,10 +1,10 @@
-from pysurvival.models.semi_parametric import NonLinearCoxPHModel
+from pysurvival_mine.models.semi_parametric import NonLinearCoxPHModel
 import torch
 import numpy as np
-from pysurvival import utils
-from pysurvival.utils import neural_networks as neur_net
-from pysurvival.utils import optimization as opt
-from pysurvival.models._coxph import _baseline_functions
+from pysurvival_mine import utils
+from pysurvival_mine.utils import neural_networks as neur_net
+from pysurvival_mine.utils import optimization as opt
+from pysurvival_mine.models._coxph import _baseline_functions
     
 class MineNonLinearCoxPHModel(NonLinearCoxPHModel):
     
@@ -94,9 +94,10 @@ class MineNonLinearCoxPHModel(NonLinearCoxPHModel):
         Efron_anti_one = torch.FloatTensor(Efron_anti_one) 
 
         # Performing order 1 optimization
-        model, loss_values = opt.optimize_mine(self, self.loss_function, model, optimizer, X, T, E, X_valid, T_valid, E_valid,Risk, Fail, 
-                      Efron_coef, Efron_one, Efron_anti_one, l2_reg,
-            lr, num_epochs, verbose,  )
+        # def optimize_mine(model_wrapper, loss_function, model, optimizer_str, X, T, E, X_valid, T_valid, E_valid, lr=1e-4, nb_epochs=1000, 
+        #        verbose = True, num_workers = 0, **kargs):
+        model, loss_values = opt.optimize_mine(self, self.loss_function, model, optimizer, X, T, E, X_valid, T_valid,E_valid,lr, num_epochs, verbose, num_workers = 0, Risk = Risk, Fail = Fail, 
+                     Efron_coef= Efron_coef, Efron_one = Efron_one, Efron_anti_one = Efron_anti_one, l2_reg = l2_reg)
 
         # Saving attributes
         self.model = model.eval()
@@ -116,7 +117,42 @@ class MineNonLinearCoxPHModel(NonLinearCoxPHModel):
         self.baseline_survival = np.array( baselines[2] )
 
         return self 
-    
+    def loss_function(self, model, X, T, E, Risk, Fail, 
+                      Efron_coef, Efron_one, Efron_anti_one, l2_reg):
+        """ Efron's approximation loss function by vectorizing 
+            all the quantities at stake
+        """
+
+        # Calculating the score
+        pre_score = model(X)
+        score = torch.reshape( torch.exp(pre_score), (-1, 1) )
+        max_nb_fails = Efron_coef.shape[1]
+
+        # Numerator calculation
+        log_score = torch.log( score )
+        log_fail  = torch.mm(Fail, log_score)
+        numerator = torch.sum(log_fail)  
+
+        # Denominator calculation
+        risk_score = torch.reshape( torch.mm(Risk, score), (-1,1) )
+        risk_score = risk_score.repeat(1, max_nb_fails)        
+        
+        fail_score = torch.reshape( torch.mm(Fail, score), (-1,1) )
+        fail_score = fail_score.repeat(1, max_nb_fails)
+        
+        Efron_Fail  = fail_score*Efron_coef 
+        Efron_Risk  = risk_score*Efron_one
+        log_efron   = torch.log( Efron_Risk - Efron_Fail + Efron_anti_one)
+                
+        denominator = torch.sum( torch.sum(log_efron, dim=1) )  
+        
+        # Adding regularization
+        loss = - (numerator - denominator)
+        for w in model.parameters():
+            loss += l2_reg*torch.sum(w*w)/2.
+            
+        return loss
+
     def predict(self, x, t = None):
         """ 
         Predicting the hazard, density and survival functions
@@ -189,3 +225,5 @@ class MineNonLinearCoxPHModel(NonLinearCoxPHModel):
             score = np.exp(score)
 
         return score
+    
+

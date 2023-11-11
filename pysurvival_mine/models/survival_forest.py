@@ -5,10 +5,10 @@ import pandas as pd
 import os
 import copy
 from sklearn.preprocessing import StandardScaler
-from pysurvival import utils
-from pysurvival.models import BaseModel
-from pysurvival.models._survival_forest import _SurvivalForestModel
-from pysurvival import PYTHON_VERSION
+from pysurvival_mine import utils
+from pysurvival_mine.models import BaseModel
+from pysurvival_mine.models._survival_forest import _SurvivalForestModel
+from pysurvival_mine import PYTHON_VERSION
 
 
 # Available Splitting

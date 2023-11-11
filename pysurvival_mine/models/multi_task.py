@@ -3,11 +3,11 @@ import torch
 import numpy as np
 import copy
 import multiprocessing
-from pysurvival import HAS_GPU
-from pysurvival import utils
-from pysurvival.utils import neural_networks as nn
-from pysurvival.utils import optimization as opt
-from pysurvival.models import BaseModel
+from pysurvival_mine import HAS_GPU
+from pysurvival_mine import utils
+from pysurvival_mine.utils import neural_networks as nn
+from pysurvival_mine.utils import optimization as opt
+from pysurvival_mine.models import BaseModel
 # %matplotlib inline
 
 class BaseMultiTaskModel(BaseModel):

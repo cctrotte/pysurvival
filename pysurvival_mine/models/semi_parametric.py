@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 import scipy
 import copy
-from pysurvival import HAS_GPU
-from pysurvival import utils
-from pysurvival.utils import neural_networks as nn
-from pysurvival.utils import optimization as opt
-from pysurvival.models import BaseModel
-from pysurvival.models._coxph import _CoxPHModel
-from pysurvival.models._coxph import _baseline_functions
+from pysurvival_mine import HAS_GPU
+from pysurvival_mine import utils
+from pysurvival_mine.utils import neural_networks as nn
+from pysurvival_mine.utils import optimization as opt
+from pysurvival_mine.models import BaseModel
+from pysurvival_mine.models._coxph import _CoxPHModel
+from pysurvival_mine.models._coxph import _baseline_functions
 
 
 class CoxPHModel(BaseModel):

@@ -1,7 +1,7 @@
 import torch 
 import torch.nn as nn
 import numpy as np
-import pysurvival.utils.optimization as opt
+import pysurvival_mine.utils.optimization as opt
 
 # --------------------------- Activation Functions --------------------------- #
 class Swish(nn.Module):

@@ -4,10 +4,10 @@ import pandas as pd
 import scipy
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.metrics import median_absolute_error
-from pysurvival.models.non_parametric import KaplanMeierModel
-from pysurvival.utils._metrics import _concordance_index
-from pysurvival.utils._metrics import _brier_score, _timeROC
-from pysurvival import utils
+from pysurvival_mine.models.non_parametric import KaplanMeierModel
+from pysurvival_mine.utils._metrics import _concordance_index
+from pysurvival_mine.utils._metrics import _brier_score, _timeROC
+from pysurvival_mine import utils
 
 
 def concordance_index(model, X, T, E, include_ties = True, 
@@ -388,7 +388,7 @@ def compare_to_actual(model, X, T, E, times = None, is_at_risk = False,
                 .format(metrics))
 
 
-        elif isinstance(metrics, list) or isinstance(metrics, numpy.ndarray) :
+        elif isinstance(metrics, list) or isinstance(metrics, np.ndarray) :
             results = {}
 
             # RMSE

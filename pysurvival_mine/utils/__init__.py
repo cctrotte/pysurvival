@@ -1,7 +1,7 @@
 import copy
 import numpy as np
 import pandas as pd
-from pysurvival.utils._functions import _logrankScores
+from pysurvival_mine.utils._functions import _logrankScores
 # %matplotlib inline for Jupyter notebooks 
 
 
@@ -149,7 +149,7 @@ def load_model(path_file):
     """
 
     # Initializing a base model
-    from pysurvival.models import BaseModel
+    from pysurvival_mine.models import BaseModel
     base_model = BaseModel()
 
     # Temporary loading the model
@@ -160,89 +160,89 @@ def load_model(path_file):
     if 'kaplanmeier' in model_name.lower():
 
         if 'smooth' in model_name.lower():
-            from pysurvival.models.non_parametric import SmoothKaplanMeierModel
+            from pysurvival_mine.models.non_parametric import SmoothKaplanMeierModel
             pysurvival_model = SmoothKaplanMeierModel()
 
         else:
-            from pysurvival.models.non_parametric import KaplanMeierModel
+            from pysurvival_mine.models.non_parametric import KaplanMeierModel
             pysurvival_model = KaplanMeierModel()
 
 
     elif 'linearmultitask' in model_name.lower():
 
-        from pysurvival.models.multi_task import LinearMultiTaskModel
+        from pysurvival_mine.models.multi_task import LinearMultiTaskModel
         pysurvival_model = LinearMultiTaskModel()
 
 
     elif 'neuralmultitask' in model_name.lower():
 
-        from pysurvival.models.multi_task import NeuralMultiTaskModel
+        from pysurvival_mine.models.multi_task import NeuralMultiTaskModel
         structure = [ {'activation': 'relu', 'num_units': 128}, ]         
         pysurvival_model = NeuralMultiTaskModel(structure=structure)
 
 
     elif 'exponential' in model_name.lower():
 
-        from pysurvival.models.parametric import ExponentialModel
+        from pysurvival_mine.models.parametric import ExponentialModel
         pysurvival_model = ExponentialModel()
 
 
     elif 'weibull' in model_name.lower():
 
-        from pysurvival.models.parametric import WeibullModel
+        from pysurvival_mine.models.parametric import WeibullModel
         pysurvival_model = WeibullModel()
 
 
     elif 'gompertz' in model_name.lower():
 
-        from pysurvival.models.parametric import GompertzModel
+        from pysurvival_mine.models.parametric import GompertzModel
         pysurvival_model = GompertzModel()
 
 
     elif 'loglogistic' in model_name.lower():
 
-        from pysurvival.models.parametric import LogLogisticModel
+        from pysurvival_mine.models.parametric import LogLogisticModel
         pysurvival_model = LogLogisticModel()
 
 
     elif 'lognormal' in model_name.lower():
 
-        from pysurvival.models.parametric import LogNormalModel
+        from pysurvival_mine.models.parametric import LogNormalModel
         pysurvival_model = LogNormalModel()
 
 
     elif 'simulation' in model_name.lower():
 
-        from pysurvival.models.simulations import SimulationModel
+        from pysurvival_mine.models.simulations import SimulationModel
         pysurvival_model = SimulationModel()
 
 
     elif 'coxph' in model_name.lower():
 
         if 'nonlinear' in model_name.lower():
-            from pysurvival.models.semi_parametric import NonLinearCoxPHModel
+            from pysurvival_mine.models.semi_parametric import NonLinearCoxPHModel
             pysurvival_model = NonLinearCoxPHModel()
 
         else:
-            from pysurvival.models.semi_parametric import CoxPHModel
+            from pysurvival_mine.models.semi_parametric import CoxPHModel
             pysurvival_model = CoxPHModel()
 
 
     elif 'random' in model_name.lower() and 'survival' in model_name.lower():
 
-        from pysurvival.models.survival_forest import RandomSurvivalForestModel
+        from pysurvival_mine.models.survival_forest import RandomSurvivalForestModel
         pysurvival_model = RandomSurvivalForestModel()
 
 
     elif 'extra' in model_name.lower() and 'survival' in model_name.lower():
 
-        from pysurvival.models.survival_forest import ExtraSurvivalTreesModel
+        from pysurvival_mine.models.survival_forest import ExtraSurvivalTreesModel
         pysurvival_model = ExtraSurvivalTreesModel()
 
 
     elif 'condi' in model_name.lower() and 'survival' in model_name.lower():
 
-        from pysurvival.models.survival_forest import ConditionalSurvivalForestModel
+        from pysurvival_mine.models.survival_forest import ConditionalSurvivalForestModel
         pysurvival_model = ConditionalSurvivalForestModel()
 
 
@@ -250,12 +250,12 @@ def load_model(path_file):
 
         if 'linear' in model_name.lower():
 
-            from pysurvival.models.svm import LinearSVMModel
+            from pysurvival_mine.models.svm import LinearSVMModel
             pysurvival_model = LinearSVMModel()
 
         elif 'kernel' in model_name.lower():
 
-            from pysurvival.models.svm import KernelSVMModel
+            from pysurvival_mine.models.svm import KernelSVMModel
             pysurvival_model = KernelSVMModel()
 
     else:

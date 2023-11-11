@@ -4,12 +4,12 @@ from matplotlib import pyplot as plt
 from matplotlib import cm as cm
 from matplotlib import colors
 from matplotlib.patches import Rectangle
-from pysurvival import utils
-from pysurvival.utils import metrics
-from pysurvival.utils.metrics import brier_score
+from pysurvival_mine import utils
+from pysurvival_mine.utils import metrics
+from pysurvival_mine.utils.metrics import brier_score
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.metrics import median_absolute_error
-from pysurvival.models.non_parametric import KaplanMeierModel
+from pysurvival_mine.models.non_parametric import KaplanMeierModel
 
 
 def display_loss_values(model, figure_size = (18, 5)):

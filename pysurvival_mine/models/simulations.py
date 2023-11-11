@@ -4,8 +4,8 @@ import pandas as pd
 import random
 import scipy
 import copy
-from pysurvival import utils
-from pysurvival.models import BaseModel
+from pysurvival_mine import utils
+from pysurvival_mine.models import BaseModel
 # %matplotlib inline
 
 # List of Survival Distributions

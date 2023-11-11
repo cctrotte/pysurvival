@@ -8,8 +8,8 @@ import zipfile
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-from pysurvival import utils
-from pysurvival.utils._functions import _get_time_buckets
+from pysurvival_mine import utils
+from pysurvival_mine.utils._functions import _get_time_buckets
 
 
 class BaseModel(object):

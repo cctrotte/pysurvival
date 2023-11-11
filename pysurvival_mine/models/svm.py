@@ -5,10 +5,10 @@ import pandas as pd
 import scipy
 import os
 import copy
-from pysurvival import utils
-from pysurvival.utils import optimization as opt
-from pysurvival.models import BaseModel
-from pysurvival.models._svm import _SVMModel
+from pysurvival_mine import utils
+from pysurvival_mine.utils import optimization as opt
+from pysurvival_mine.models import BaseModel
+from pysurvival_mine.models._svm import _SVMModel
 
 
 # Available Kernel functions
