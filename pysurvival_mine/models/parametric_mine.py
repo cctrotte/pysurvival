@@ -1,5 +1,5 @@
 import numpy as np
-import scipy 
+import scipy
 import torch
 from pysurvival_mine.models import BaseModel
 from pysurvival_mine import utils, HAS_GPU
@@ -8,75 +8,71 @@ from pysurvival_mine.utils import neural_networks as nn
 
 
 class BaseParametricModelMine(BaseModel):
-    """ Base class for all the Parametric estimators:
-        ---------------------------------------------
+    """Base class for all the Parametric estimators:
+    ---------------------------------------------
 
-        Parametric models are special cases of the Cox proportional hazard
-        model where is is assumed that the baseline hazard has a specific 
-        parametric form.
-        
-        The BaseParametricModel object provides the necessary framework to use
-        the properties of parametric models. It should not be used on its own.
+    Parametric models are special cases of the Cox proportional hazard
+    model where is is assumed that the baseline hazard has a specific
+    parametric form.
 
-        Parameters
-        ----------
-        * bins: int (default=100)
-             Number of subdivisions of the time axis 
+    The BaseParametricModel object provides the necessary framework to use
+    the properties of parametric models. It should not be used on its own.
 
-        * auto_scaler: boolean (default=True)
-            Determines whether a sklearn scaler should be automatically applied
+    Parameters
+    ----------
+    * bins: int (default=100)
+         Number of subdivisions of the time axis
+
+    * auto_scaler: boolean (default=True)
+        Determines whether a sklearn scaler should be automatically applied
     """
 
-    def __init__(self, bins = 100, auto_scaler=True):
-            
+    def __init__(self, bins=100, auto_scaler=True):
+
         # Saving the attributes
         self.loss_values = []
         self.bins = bins
 
         # Initializing the elements from BaseModel
         super(BaseParametricModelMine, self).__init__(auto_scaler)
-        
-    
+
     def get_hazard_survival(self, model, x, t):
         pass
-    
 
-    def get_times(self, T, is_min_time_zero = True, extra_pct_time = 0.1):
-        """ Building the time axis (self.times) as well as the time intervals 
-            ( all the [ t(k-1), t(k) ) in the time axis.
+    def get_times(self, T, is_min_time_zero=True, extra_pct_time=0.1):
+        """Building the time axis (self.times) as well as the time intervals
+        ( all the [ t(k-1), t(k) ) in the time axis.
         """
 
         # Setting the min_time and max_time
         max_time = max(T)
-        if is_min_time_zero :
-            min_time = 0. 
+        if is_min_time_zero:
+            min_time = 0.0
         else:
             min_time = min(T)
-        
+
         # Setting optional extra percentage time
-        if 0. <= extra_pct_time <= 1.:
+        if 0.0 <= extra_pct_time <= 1.0:
             p = extra_pct_time
         else:
-            raise Exception("extra_pct_time has to be between [0, 1].") 
+            raise Exception("extra_pct_time has to be between [0, 1].")
 
         # Building time points and time buckets
-        self.times = np.linspace(min_time, max_time*(1. + p), self.bins)
+        self.times = np.linspace(min_time, max_time * (1.0 + p), self.bins)
         self.get_time_buckets()
         self.nb_times = len(self.time_buckets)
 
-
-
     def loss_function(self, model, X, T, E, l2_reg):
-        """ Computes the loss function of any Parametric models. 
-            All the operations have been vectorized to ensure optimal speed
+        """Computes the loss function of any Parametric models.
+        All the operations have been vectorized to ensure optimal speed
         """
-        
+
         # Adapting the optimization for the use of GPU
         # if HAS_GPU:
         #     X = X.cuda(async=True)
         #     T = T.cuda(async=True)
         #     E = E.cuda(async=True)
-        #     model = model.cuda()   
+        #     model = model.cuda()
 
         # Hazard & Survival calculations
         hazard, Survival = self.get_hazard_survival(model, X, T)
@@ -84,19 +80,32 @@ class BaseParametricModelMine(BaseModel):
         # Loss function calculations
         hazard = torch.max(hazard, torch.FloatTensor([1e-6]))
         Survival = torch.max(Survival, torch.FloatTensor([1e-6]))
-        loss = - torch.sum( E*torch.log(hazard) + torch.log(Survival) ) 
+        loss = -torch.sum(E * torch.log(hazard) + torch.log(Survival))
 
         # Adding the regularized loss
         for w in model.parameters():
-            loss += l2_reg*torch.sum(w*w)/2.
+            loss += l2_reg * torch.sum(w * w) / 2.0
 
         return loss
 
-    
-    def fit(self, X, T, E, X_valid, T_valid, E_valid, init_method = 'glorot_uniform', optimizer ='adam', 
-            lr = 1e-4, num_epochs = 1000, l2_reg=1e-2, verbose=True, 
-            is_min_time_zero = True, extra_pct_time = 0.1):
-        """ 
+    def fit(
+        self,
+        X,
+        T,
+        E,
+        X_valid,
+        T_valid,
+        E_valid,
+        init_method="glorot_uniform",
+        optimizer="adam",
+        lr=1e-4,
+        num_epochs=1000,
+        l2_reg=1e-2,
+        verbose=True,
+        is_min_time_zero=True,
+        extra_pct_time=0.1,
+    ):
+        """
         Fit the estimator based on the given parameters.
 
         Parameters:
@@ -104,20 +113,20 @@ class BaseParametricModelMine(BaseModel):
         * `X` : **array-like**, *shape=(n_samples, n_features)* --
             The input samples.
 
-        * `T` : **array-like** -- 
+        * `T` : **array-like** --
             The target values describing when the event of interest or censoring
             occurred.
 
         * `E` : **array-like** --
-            The values that indicate if the event of interest occurred i.e.: 
-            E[i]=1 corresponds to an event, and E[i] = 0 means censoring, 
+            The values that indicate if the event of interest occurred i.e.:
+            E[i]=1 corresponds to an event, and E[i] = 0 means censoring,
             for all i.
 
-        * `init_method` : **str** *(default = 'glorot_uniform')* -- 
+        * `init_method` : **str** *(default = 'glorot_uniform')* --
             Initialization method to use. Here are the possible options:
 
-            * `glorot_uniform`:  Glorot/Xavier uniform initializer 
-            * `he_uniform`:  He uniform variance scaling initializer 
+            * `glorot_uniform`:  Glorot/Xavier uniform initializer
+            * `he_uniform`:  He uniform variance scaling initializer
             * `uniform`: Initializing tensors with uniform (-1, 1) distribution
             * `glorot_normal`: Glorot normal initializer,
             * `he_normal`: He normal initializer.
@@ -126,7 +135,7 @@ class BaseParametricModelMine(BaseModel):
             * `zeros`: Initializing tensors to 0
             * `orthogonal`: Initializing tensors with a orthogonal matrix,
 
-        * `optimizer`:  **str** *(default = 'adam')* -- 
+        * `optimizer`:  **str** *(default = 'adam')* --
             iterative method for optimizing a differentiable objective function.
             Here are the possible options:
 
@@ -138,22 +147,22 @@ class BaseParametricModelMine(BaseModel):
             - `sparseadam`
             - `sgd`
 
-        * `lr`: **float** *(default=1e-4)* -- 
+        * `lr`: **float** *(default=1e-4)* --
             learning rate used in the optimization
 
-        * `num_epochs`: **int** *(default=1000)* -- 
+        * `num_epochs`: **int** *(default=1000)* --
             The number of iterations in the optimization
 
-        * `l2_reg`: **float** *(default=1e-4)* -- 
+        * `l2_reg`: **float** *(default=1e-4)* --
             L2 regularization parameter for the model coefficients
 
-        * `verbose`: **bool** *(default=True)* -- 
+        * `verbose`: **bool** *(default=True)* --
             Whether or not producing detailed logging about the modeling
 
-        * `extra_pct_time`: **float** *(default=0.1)* -- 
+        * `extra_pct_time`: **float** *(default=0.1)* --
             Providing an extra fraction of time in the time axis
 
-        * `is_min_time_zero`: **bool** *(default=True)* -- 
+        * `is_min_time_zero`: **bool** *(default=True)* --
             Whether the the time axis starts at 0
 
         Returns:
@@ -177,16 +186,16 @@ class BaseParametricModelMine(BaseModel):
 
         #### 2 - Generating the dataset from a Gompertz parametric model
         # Initializing the simulation model
-        sim = SimulationModel( survival_distribution = 'Gompertz',  
+        sim = SimulationModel( survival_distribution = 'Gompertz',
                                risk_type = 'linear',
-                               censored_parameter = 10.0, 
+                               censored_parameter = 10.0,
                                alpha = .01, beta = 3.0 )
 
-        # Generating N random samples 
+        # Generating N random samples
         N = 1000
         dataset = sim.generate_data(num_samples = N, num_features = 3)
 
-        # Showing a few data-points 
+        # Showing a few data-points
         time_column = 'time'
         event_column = 'event'
         dataset.head(2)
@@ -207,7 +216,7 @@ class BaseParametricModelMine(BaseModel):
 
         #### 4 - Creating an instance of the Gompertz model and fitting the data
         # Building the model
-        gomp_model = GompertzModel() 
+        gomp_model = GompertzModel()
         gomp_model.fit(X_train, T_train, E_train, lr=1e-2, init_method='zeros',
             optimizer ='adam', l2_reg = 1e-3, num_epochs=2000)
 
@@ -215,11 +224,11 @@ class BaseParametricModelMine(BaseModel):
         c_index = concordance_index(gomp_model, X_test, T_test, E_test) #0.8
         print('C-index: {:.2f}'.format(c_index))
 
-        ibs = integrated_brier_score(gomp_model, X_test, T_test, E_test, 
+        ibs = integrated_brier_score(gomp_model, X_test, T_test, E_test,
             t_max=30, figure_size=(20, 6.5) )
 
         """
-        
+
         # Checking data format (i.e.: transforming into numpy array)
         X, T, E = utils.check_data(X, T, E)
         T = np.maximum(T, 1e-6)
@@ -228,22 +237,21 @@ class BaseParametricModelMine(BaseModel):
         # Extracting data parameters
         nb_units, self.num_vars = X.shape
         input_shape = self.num_vars
-    
-        # Scaling data 
+
+        # Scaling data
         if self.auto_scaler:
-            X = self.scaler.fit_transform( X ) 
+            X = self.scaler.fit_transform(X)
 
         # Does the model need a parameter called Beta
         is_beta_used = True
-        init_alpha = 1.
-        if self.name == 'ExponentialModel':
+        init_alpha = 1.0
+        if self.name == "ExponentialModel":
             is_beta_used = False
-        if self.name == 'GompertzModel':
-            init_alpha = 1000.
+        if self.name == "GompertzModel":
+            init_alpha = 1000.0
 
         # Initializing the model
-        model = nn.ParametricNet(input_shape, init_method, init_alpha, 
-            is_beta_used)
+        model = nn.ParametricNet(input_shape, init_method, init_alpha, is_beta_used)
 
         # Trasnforming the inputs into tensors
         X = torch.FloatTensor(X)
@@ -255,24 +263,37 @@ class BaseParametricModelMine(BaseModel):
         E_valid = torch.FloatTensor(E_valid.reshape(-1, 1))
 
         # Performing order 1 optimization
-        model, loss_values = opt.optimize_mine(self, self.loss_function, model, optimizer, 
-            X, T, E, X_valid, T_valid,E_valid, lr, num_epochs, verbose, l2_reg=l2_reg)
-        
+        model, loss_values = opt.optimize_mine(
+            self,
+            self.loss_function,
+            model,
+            optimizer,
+            X,
+            T,
+            E,
+            X_valid,
+            T_valid,
+            E_valid,
+            lr,
+            num_epochs,
+            verbose,
+            l2_reg=l2_reg,
+        )
+
         # Saving attributes
         self.model = model.eval()
         self.loss_values = loss_values
 
         # Calculating the AIC
-        self.aic = 2*self.loss_values[-1] 
-        self.aic -= 2*(self.num_vars + 1 + is_beta_used*1. - 1)
+        self.aic = 2 * self.loss_values[-1]
+        self.aic -= 2 * (self.num_vars + 1 + is_beta_used * 1.0 - 1)
 
         return self
-    
-    
-    def predict(self, x, t = None, model = None):
-        """ 
+
+    def predict(self, x, t=None, model=None):
+        """
         Predicting the hazard, density and survival functions
-        
+
         Arguments:
         ----------
             * x: pd.Dataframe or np.ndarray or list
@@ -281,16 +302,16 @@ class BaseParametricModelMine(BaseModel):
                 will take care of it
             * t: float (default=None)
                 Time at which hazard, density and survival functions
-                should be calculated. If None, the method returns 
-                the functions for all times t. 
+                should be calculated. If None, the method returns
+                the functions for all times t.
         """
-        
+
         # Scaling the data
         if self.auto_scaler:
             if x.ndim == 1:
-                x = self.scaler.transform( x.reshape(1, -1) )
+                x = self.scaler.transform(x.reshape(1, -1))
             elif x.ndim == 2:
-                x = self.scaler.transform( x )
+                x = self.scaler.transform(x)
         else:
             # Ensuring x has 2 dimensions
             if x.ndim == 1:
@@ -299,43 +320,43 @@ class BaseParametricModelMine(BaseModel):
         # Transforming into pytorch objects
         x = torch.FloatTensor(x)
         times = torch.FloatTensor(self.times.flatten())
-            
+
         # Calculating hazard, density, Survival
         if model is None:
             hazard, Survival = self.get_hazard_survival(self.model, x, times)
         else:
             hazard, Survival = self.get_hazard_survival(model, x, times)
-        density = hazard*Survival
+        density = hazard * Survival
 
         # Transforming into numpy objects
         hazard = hazard.data.numpy()
         density = density.data.numpy()
         Survival = Survival.data.numpy()
-            
+
         # Returning the full functions of just one time point
         if t is None:
             return hazard, density, Survival
         else:
-            min_abs_value = [abs(a_j_1-t) for (a_j_1, a_j) in self.time_buckets]
+            min_abs_value = [abs(a_j_1 - t) for (a_j_1, a_j) in self.time_buckets]
             index = np.argmin(min_abs_value)
             return hazard[:, index], density[:, index], Survival[:, index]
-        
+
     def predict_risk_mine(self, model, x, use_log=False):
-        """ Computing the risk score 
+        """Computing the risk score
 
         Parameters:
         -----------
         * `x` : **array-like** *shape=(n_samples, n_features)* --
-            array-like representing the datapoints. 
+            array-like representing the datapoints.
             x should not be standardized before, the model
             will take care of it
 
-        * `use_log`: **bool** *(default=True)* -- 
+        * `use_log`: **bool** *(default=True)* --
             Applies the log function to the risk values
 
         """
-        
-        hazard, density, survival = self.predict( x, model = model)
+
+        hazard, density, survival = self.predict(x, model=model)
         cumulative_hazard = np.cumsum(hazard, 1)
         risk = np.sum(cumulative_hazard, 1)
         if use_log:
@@ -343,24 +364,28 @@ class BaseParametricModelMine(BaseModel):
         else:
             return risk
 
+    def predict_survival_mine(self, model, x, t=None):
+        hazard, density, survival = self.predict(x, model=model)
+        return survival
+
     def predict_risk(self, x, **kwargs):
-        """ Predicts the Risk Score/Mortality function for all t,
-            R(x) = sum( cumsum(hazard(t, x)) )
-            According to Random survival forests from Ishwaran H et al
-            https://arxiv.org/pdf/0811.1645.pdf
+        """Predicts the Risk Score/Mortality function for all t,
+        R(x) = sum( cumsum(hazard(t, x)) )
+        According to Random survival forests from Ishwaran H et al
+        https://arxiv.org/pdf/0811.1645.pdf
 
-            Parameters
-            ----------
-            * `x` : **array-like** *shape=(n_samples, n_features)* --
-                array-like representing the datapoints. 
-                x should not be standardized before, the model
-                will take care of it
+        Parameters
+        ----------
+        * `x` : **array-like** *shape=(n_samples, n_features)* --
+            array-like representing the datapoints.
+            x should not be standardized before, the model
+            will take care of it
 
-            Returns
-            -------
-            * `risk_score`: **numpy.ndarray** --
-                array-like representing the prediction of Risk Score function
-        """        
+        Returns
+        -------
+        * `risk_score`: **numpy.ndarray** --
+            array-like representing the prediction of Risk Score function
+        """
 
         # Checking if the data has the right format
         x = utils.check_data(x)
@@ -369,59 +394,61 @@ class BaseParametricModelMine(BaseModel):
         cumulative_hazard = self.predict_cumulative_hazard(x, None, **kwargs)
         risk_score = np.sum(cumulative_hazard, 1)
         return risk_score
-        
+
+
 class GompertzModelMine(BaseParametricModelMine):
     """
     GompertzModel:
     --------------
 
-    The Gompertz distribution is a continuous probability distribution,  
-    that has an exponentially increasing failure rate, and is often 
+    The Gompertz distribution is a continuous probability distribution,
+    that has an exponentially increasing failure rate, and is often
     applied to analyze survival data.
-    
+
     """
 
     def get_hazard_survival(self, model, x, t):
-        """ Computing the hazard and Survival functions. """
-        
+        """Computing the hazard and Survival functions."""
+
         # Computing the score
-        score  = model(x).reshape(-1, 1)
+        score = model(x).reshape(-1, 1)
 
         # Extracting beta
         beta = list(model.parameters())[-1]
 
         # Computing hazard and Survival
-        hazard   = score*torch.exp(beta*t)
-        Survival = torch.exp(-score/beta*(torch.exp(beta*t)-1) )
-        
+        hazard = score * torch.exp(beta * t)
+        Survival = torch.exp(-score / beta * (torch.exp(beta * t) - 1))
+
         return hazard, Survival
+
 
 class LogLogisticModelMine(BaseParametricModelMine):
     """
     LogLogisticModel:
     ----------------
-    
-    As the name suggests, the log-logistic distribution is the distribution 
-    of a variable whose logarithm has the logistic distribution. 
+
+    As the name suggests, the log-logistic distribution is the distribution
+    of a variable whose logarithm has the logistic distribution.
     The log-logistic distribution is often used to model random lifetimes.
     (http://www.randomservices.org/random/special/LogLogistic.html)
-    
+
     """
 
     def get_hazard_survival(self, model, x, t):
-        """ Computing the hazard and Survival functions. """
-        
+        """Computing the hazard and Survival functions."""
+
         # Computing the score
-        score  = model(x).reshape(-1, 1)
+        score = model(x).reshape(-1, 1)
 
         # Extracting beta
         beta = list(model.parameters())[-1]
 
         # Computing hazard and Survival
-        hazard  = score*beta*torch.pow(t, beta-1)
-        hazard  = hazard/(1 + score*torch.pow(t, beta) )
-        Survival = 1./(1. + torch.pow(score*t, beta) ) 
-        
+        hazard = score * beta * torch.pow(t, beta - 1)
+        hazard = hazard / (1 + score * torch.pow(t, beta))
+        Survival = 1.0 / (1.0 + torch.pow(score * t, beta))
+
         return hazard, Survival
 
 
@@ -429,32 +456,33 @@ class LogNormalModelMine(BaseParametricModelMine):
     """
     LogNormalModel:
     ---------------
-    
-    The lognormal distribution is used to model continuous random quantities 
+
+    The lognormal distribution is used to model continuous random quantities
     when the distribution is believed to be skewed, such as lifetime variables
     (http://www.randomservices.org/random/special/LogNormal.html)
-    
+
     """
 
     def get_hazard_survival(self, model, x, t):
-        """ Computing the hazard and Survival functions. """
-        
+        """Computing the hazard and Survival functions."""
+
         # Computing the score
-        score  = model(x).reshape(-1, 1)
+        score = model(x).reshape(-1, 1)
 
         # Extracting beta
         beta = list(model.parameters())[-1]
 
         # Initializing the Normal distribution
         from torch.distributions.normal import Normal
+
         m = Normal(torch.tensor([0.0]), torch.tensor([1.0]))
 
         # Computing hazard and Survival
-        hazard =  (torch.log(t) - torch.log(score))/(np.sqrt(2)*beta)
-        Survival = 1. - m.cdf((torch.log(t)-torch.log(score))/(np.sqrt(2)*beta))
-        hazard = hazard*(torch.log(t) - torch.log(score))/(np.sqrt(2)*beta)
-        hazard = torch.exp( -hazard/2.)
-        hazard = hazard/(np.sqrt(2*np.pi)*Survival*(t*beta))
+        hazard = (torch.log(t) - torch.log(score)) / (np.sqrt(2) * beta)
+        Survival = 1.0 - m.cdf((torch.log(t) - torch.log(score)) / (np.sqrt(2) * beta))
+        hazard = hazard * (torch.log(t) - torch.log(score)) / (np.sqrt(2) * beta)
+        hazard = torch.exp(-hazard / 2.0)
+        hazard = hazard / (np.sqrt(2 * np.pi) * Survival * (t * beta))
 
         hazard = torch.max(hazard, torch.FloatTensor([1e-6]))
         Survival = torch.max(Survival, torch.FloatTensor([1e-6]))

@@ -20,7 +20,7 @@ import torch
 # Dev branch marker is: 'X.Y.dev' or 'X.Y.devN' where N is an integer.
 # 'X.Y.dev0' is the canonical version of 'X.Y.dev'
 #
-__version__ = '0.1.2'
+__version__ = "0.1.2"
 
 
 # ---------------------------- GLOBAL VARIABLES ---------------------------- #
@@ -28,5 +28,7 @@ PYTHON_VERSION = sys.version_info[0]
 HAS_GPU = torch.cuda.is_available()
 
 
-__all__ = [  'PYTHON_VERSION', 'HAS_GPU', ]
-
+__all__ = [
+    "PYTHON_VERSION",
+    "HAS_GPU",
+]
