@@ -366,17 +366,19 @@ def fit_and_tune_bis(
                 except Exception as e:
                     print(f"Error fitting model: {e}")
             elif model_name in ["surv_machine"]:
-                model.fit(
-                    X_train,
-                    T_train,
-                    E_train,
-                    val_data=(X_valid, T_valid, E_valid),
-                    pat_thresh=3,
-                    metric_name="ctd",
-                    iters=2000,
-                    learning_rate=current_params["learning_rate"],
-                )
-
+                try:
+                    model.fit(
+                        X_train,
+                        T_train,
+                        E_train,
+                        val_data=(X_valid, T_valid, E_valid),
+                        pat_thresh=3,
+                        metric_name="ctd",
+                        iters=2000,
+                        learning_rate=current_params["learning_rate"],
+                    )
+                except Exception as e:
+                    print(f"Error fitting model: {e}")
             else:
                 try:
                     model.fit(X_train, T_train, E_train, **fit_params)
