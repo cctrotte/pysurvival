@@ -1,6 +1,5 @@
 import numpy as np
 
-c
 
 
 def compute_coxph(split_dict, vars_, drop=True):

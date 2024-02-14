@@ -26,7 +26,7 @@ def make_train_test_split(X, T, E, ID, index_train, index_valid, index_test):
     )
     T_train, T_valid, T_test = T[index_train], T[index_valid], T[index_test]
     E_train, E_valid, E_test = E[index_train], E[index_valid], E[index_test]
-    ID_train, ID_valid, ID_test = ID[index_train], ID[index_valid], ID[index_test]
+    ID_train, ID_valid, ID_test = ID.iloc[index_train], ID.iloc[index_valid], ID.iloc[index_test]
 
     return {
         "X_train": X_train,
@@ -119,22 +119,28 @@ def get_folds(split_dict, vars_, folds=None, impute=True):
     fold_dict = {key: {} for key in range(5)}
     if folds is None:
         X_train = pd.concat((split_dict["X_train"], split_dict["X_valid"]))
+        X_test = split_dict["X_test"]
         idx = X_train["soascaseid"].values
         T_train = X_train["T"]
         E_train = X_train["E"]
+        T_test = X_test["T"]
+        E_test = X_test["E"]
         kf = KFold(n_splits=5, random_state=42, shuffle=True)
     for i, (train_index, valid_index) in enumerate(kf.split(idx)):
-        fold_dict[i]["X_train"], fold_dict[i]["X_valid"] = (
+        fold_dict[i]["X_train"], fold_dict[i]["X_valid"], fold_dict[i]["X_test"] = (
             X_train[vars_].iloc[train_index],
             X_train[vars_].iloc[valid_index],
+            X_test[vars_]
         )
-        fold_dict[i]["T_train"], fold_dict[i]["T_valid"] = (
+        fold_dict[i]["T_train"], fold_dict[i]["T_valid"], fold_dict[i]["T_test"]  = (
             T_train.iloc[train_index].values,
             T_train.iloc[valid_index].values,
+            T_test.values
         )
-        fold_dict[i]["E_train"], fold_dict[i]["E_valid"] = (
+        fold_dict[i]["E_train"], fold_dict[i]["E_valid"], fold_dict[i]["E_test"] = (
             E_train.iloc[train_index].values,
             E_train.iloc[valid_index].values,
+            E_test.values
         )
         fold_dict[i]["ID_train"], fold_dict[i]["ID_valid"] = (
             idx[train_index],
@@ -143,6 +149,7 @@ def get_folds(split_dict, vars_, folds=None, impute=True):
         scaler = StandardScaler()
         fold_dict[i]["X_train_scaled"] = scaler.fit_transform(fold_dict[i]["X_train"])
         fold_dict[i]["X_valid_scaled"] = scaler.transform(fold_dict[i]["X_valid"])
+        fold_dict[i]["X_test_scaled"] = scaler.transform(fold_dict[i]["X_test"])
 
         if impute:
             means = pd.DataFrame(fold_dict[i]["X_train_scaled"]).mean(axis=0)
@@ -151,6 +158,9 @@ def get_folds(split_dict, vars_, folds=None, impute=True):
             )
             fold_dict[i]["X_valid_scaled"] = np.array(
                 pd.DataFrame(fold_dict[i]["X_valid_scaled"]).fillna(means).values
+            )
+            fold_dict[i]["X_test_scaled"] = np.array(
+                pd.DataFrame(fold_dict[i]["X_test_scaled"]).fillna(means).values
             )
 
     return fold_dict, kf
@@ -352,6 +362,7 @@ def fit_and_tune_bis(
                 )
             else:
                 fit_params = current_params
+                fit_params["eval_times"] = eval_times
             if model_name in ["linear", "linear_nn", "coxph_nn"]:
                 try:
                     model.fit(
@@ -412,6 +423,8 @@ def fit_and_tune_bis(
                         )
                     )
                 score["overall_ctd"] = np.max(model.metrics["ctd"])
+                score["overall_auc"] = np.max(model.metrics["auc"])
+                score["overall_ibs"] = np.min(model.metrics["ibs"])
 
             except Exception as e:
                 print(f"Error computing C-index: {e}")
